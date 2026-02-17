@@ -97,6 +97,10 @@ export default function Home() {
           border-color: #A5B4FC !important;
           box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
         }
+        .pb-feedback:hover {
+          color: #4F46E5 !important;
+          text-decoration: underline;
+        }
 
         /* ── Mobile (≤768px) ── */
         @media (max-width: 768px) {
@@ -334,6 +338,20 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* ── Feedback ── */}
+        <div style={s.feedbackWrap}>
+          <a
+            className="pb-feedback"
+            style={s.feedbackLink}
+            href="https://forms.gle/CCEjrQYFFye3PG6K7"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Share feedback about PromptBuddy"
+          >
+            Have feedback? Share it →
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -681,5 +699,19 @@ const s = {
     fontSize: 12,
     fontWeight: 500,
     color: C.muted,
+  },
+
+  /* Feedback */
+  feedbackWrap: {
+    marginTop: 40,
+    textAlign: "center",
+  },
+  feedbackLink: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: C.muted,
+    textDecoration: "none",
+    cursor: "pointer",
+    transition: "color 150ms ease",
   },
 };
