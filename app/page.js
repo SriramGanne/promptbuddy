@@ -97,20 +97,78 @@ export default function Home() {
           border-color: #A5B4FC !important;
           box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
         }
+
+        /* ── Mobile (≤768px) ── */
+        @media (max-width: 768px) {
+          .pb-container {
+            padding: 28px 16px 48px !important;
+          }
+          .pb-hero-title {
+            font-size: 34px !important;
+          }
+          .pb-hero-subtitle {
+            font-size: 16px !important;
+          }
+          .pb-hero {
+            margin-bottom: 36px !important;
+          }
+          .pb-controls {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+          }
+          .pb-select-group {
+            width: 100% !important;
+          }
+          .pb-select-group select {
+            flex: 1 !important;
+          }
+          .pb-btn-group {
+            flex-direction: column !important;
+            gap: 10px !important;
+          }
+          .pb-btn-group button {
+            width: 100% !important;
+            padding: 12px 20px !important;
+            justify-content: center !important;
+          }
+          .pb-panels {
+            gap: 16px !important;
+          }
+          .pb-panel {
+            flex-basis: 100% !important;
+            min-height: auto !important;
+          }
+          .pb-panel textarea {
+            min-height: 180px !important;
+          }
+          .pb-metrics-row {
+            flex-direction: column !important;
+            gap: 12px !important;
+          }
+          .pb-metric {
+            max-width: none !important;
+            flex-basis: 100% !important;
+          }
+          .pb-global-row {
+            gap: 28px 0 !important;
+            flex-direction: column !important;
+          }
+        }
       `}</style>
 
-      <div style={s.container}>
+      <div className="pb-container" style={s.container}>
         {/* ── Hero ── */}
-        <header style={s.hero}>
-          <h1 style={s.title}>PromptBuddy</h1>
-          <p style={s.subtitle}>
+        <header className="pb-hero" style={s.hero}>
+          <h1 className="pb-hero-title" style={s.title}>PromptBuddy</h1>
+          <p className="pb-hero-subtitle" style={s.subtitle}>
             Turn plain thoughts into powerful prompts.
           </p>
         </header>
 
         {/* ── Controls Row ── */}
-        <div style={s.controlsRow}>
-          <div style={s.selectGroup}>
+        <div className="pb-controls" style={s.controlsRow}>
+          <div className="pb-select-group" style={s.selectGroup}>
             <label style={s.selectLabel} htmlFor="targetModel">
               Optimize for:
             </label>
@@ -129,7 +187,7 @@ export default function Home() {
             </select>
           </div>
 
-          <div style={s.buttonGroup}>
+          <div className="pb-btn-group" style={s.buttonGroup}>
             <button
               className="pb-primary"
               style={{
@@ -159,9 +217,9 @@ export default function Home() {
         {error && <div style={s.error}>{error}</div>}
 
         {/* ── Side-by-Side Panels ── */}
-        <div style={s.panelsRow}>
+        <div className="pb-panels" style={s.panelsRow}>
           {/* Left: Original */}
-          <div style={s.panel}>
+          <div className="pb-panel" style={s.panel}>
             <div style={s.panelHeader}>
               <h2 style={s.panelTitle}>Original Prompt</h2>
             </div>
@@ -175,7 +233,7 @@ export default function Home() {
           </div>
 
           {/* Right: Optimized */}
-          <div style={{ ...s.panel, ...s.panelOptimized }}>
+          <div className="pb-panel" style={{ ...s.panel, ...s.panelOptimized }}>
             <div style={s.panelHeader}>
               <div>
                 <h2 style={s.panelTitle}>Optimized Prompt</h2>
@@ -216,7 +274,7 @@ export default function Home() {
 
         {/* ── Token Metrics ── */}
         {showMetrics && (
-          <div style={s.metricsRow}>
+          <div className="pb-metrics-row" style={s.metricsRow}>
             <div className="pb-metric" style={s.metricCard}>
               <span style={s.metricLabel}>Original Tokens</span>
               <span style={s.metricValue}>{metrics.original}</span>
@@ -244,11 +302,11 @@ export default function Home() {
           </div>
         )}
         {/* ── Global Optimization Impact ── */}
-        {globalStats && globalStats.totalOptimizations > 0 && (
+        {globalStats?.showStats && (
           <section style={s.globalSection}>
             <div style={s.globalDivider} />
             <h3 style={s.globalTitle}>Global Optimization Impact</h3>
-            <div style={s.globalRow}>
+            <div className="pb-global-row" style={s.globalRow}>
               <div style={s.globalStat}>
                 <span style={s.globalValue}>
                   {globalStats.totalOptimizations.toLocaleString()}

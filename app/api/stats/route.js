@@ -5,6 +5,7 @@ import { supabase } from "../../../lib/supabase";
 let cache = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in ms
+const MIN_RECORDS = 50;
 
 export async function GET() {
   // Return cached data if fresh
@@ -14,25 +15,31 @@ export async function GET() {
   }
 
   try {
-    // Run all queries in parallel
-    const [countRes, avgRes, savedRes, modelRes] = await Promise.all([
-      // Total optimizations
-      supabase
-        .from("prompt_metrics")
-        .select("*", { count: "exact", head: true }),
+    // Step 1: Check record count first (cheap query)
+    const countRes = await supabase
+      .from("prompt_metrics")
+      .select("*", { count: "exact", head: true });
 
-      // Average reduction percent
+    const totalOptimizations = countRes.count ?? 0;
+
+    // Below threshold — skip expensive RPCs, cache the "hidden" response
+    if (totalOptimizations < MIN_RECORDS) {
+      const hidden = { showStats: false };
+      cache = hidden;
+      cacheTimestamp = now;
+      return NextResponse.json(hidden);
+    }
+
+    // Step 2: Enough records — run aggregate RPCs in parallel
+    const [avgRes, savedRes, modelRes] = await Promise.all([
       supabase.rpc("avg_reduction"),
-
-      // Total tokens saved (original - optimized)
       supabase.rpc("total_tokens_saved"),
-
-      // Most used target model
       supabase.rpc("most_used_model"),
     ]);
 
     const stats = {
-      totalOptimizations: countRes.count ?? 0,
+      showStats: true,
+      totalOptimizations,
       avgReduction: Math.round(avgRes.data ?? 0),
       totalTokensSaved: savedRes.data ?? 0,
       mostUsedModel: modelRes.data ?? "—",
@@ -46,17 +53,9 @@ export async function GET() {
   } catch (err) {
     console.error("Stats error:", err);
 
-    // Return stale cache if available, otherwise zeros
+    // Return stale cache if available, otherwise hidden
     if (cache) return NextResponse.json(cache);
 
-    return NextResponse.json(
-      {
-        totalOptimizations: 0,
-        avgReduction: 0,
-        totalTokensSaved: 0,
-        mostUsedModel: "—",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ showStats: false }, { status: 500 });
   }
 }
