@@ -185,15 +185,40 @@ async function main() {
   const existingTitles = await fetchExistingTitles(supabase);
   console.log(`  ${existingTitles.size} rows already in the table.`);
 
-  // Dedup by title — skip anything already present.
-  const fresh = entries.filter((e) => !existingTitles.has(e.title));
-  const skipped = entries.length - fresh.length;
+  // Dedup by title — skip embedding for anything already present, but still
+  // sync editable metadata (summary, best_for, category, citation_url,
+  // is_featured) so edits to the seed JSON land in the DB on re-run.
+  const fresh     = entries.filter((e) => !existingTitles.has(e.title));
+  const existing  = entries.filter((e) =>  existingTitles.has(e.title));
+  const skipped   = existing.length;
   if (skipped > 0) {
-    console.log(`  ↪ Skipping ${skipped} duplicate${skipped === 1 ? "" : "s"}.`);
+    console.log(`  ↪ ${skipped} duplicate${skipped === 1 ? "" : "s"} — will sync metadata (no re-embed).`);
+  }
+
+  // ── Metadata sync for existing rows ────────────────────────────────────
+  if (existing.length > 0) {
+    console.log(`\nSyncing metadata for ${existing.length} existing row${existing.length === 1 ? "" : "s"}…`);
+    for (const e of existing) {
+      const { error } = await supabase
+        .from("prompt_research")
+        .update({
+          summary:      e.summary ?? null,
+          best_for:     e.best_for ?? null,
+          category:     e.category ?? null,
+          citation_url: e.citation_url ?? null,
+          is_featured:  Boolean(e.is_featured),
+        })
+        .eq("title", e.title);
+      if (error) {
+        console.warn(`  ⚠ Failed to sync "${e.title}": ${error.message}`);
+      } else {
+        console.log(`  ✓ Synced: "${e.title}"`);
+      }
+    }
   }
 
   if (fresh.length === 0) {
-    console.log("\nNothing new to ingest. Done.");
+    console.log("\nNo new entries to embed. Done.");
     return;
   }
 
@@ -211,6 +236,7 @@ async function main() {
       title:        e.title,
       content:      e.content,
       summary:      e.summary ?? null,
+      best_for:     e.best_for ?? null,
       category:     e.category ?? null,
       citation_url: e.citation_url ?? null,
       is_featured:  Boolean(e.is_featured),

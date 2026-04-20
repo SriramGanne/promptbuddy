@@ -45,14 +45,9 @@ export default async function VaultPage() {
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-accent to-accent-2 shadow-[0_4px_14px_rgba(124,58,237,0.45)]" />
-              <div className="flex items-baseline gap-2">
-                <span className="text-[17px] font-semibold tracking-tight text-text">
-                  PromptBuddy
-                </span>
-                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-dim">
-                  Pro
-                </span>
-              </div>
+              <span className="text-[17px] font-semibold tracking-tight text-text">
+                PromptBuddy
+              </span>
             </Link>
             <div className="hidden sm:block">
               <NavTabs />

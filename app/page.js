@@ -53,6 +53,10 @@ export default function Home() {
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [clarityScore, setClarityScore] = useState(null);
+  // clarifyRound counts how many times the backend has asked for more info.
+  // Incremented whenever a new set of questions arrives; drives the
+  // "Follow-up Questions (Round N)" label and keys the fade-in transition.
+  const [clarifyRound, setClarifyRound] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [powerMode, setPowerMode] = useState(false);
@@ -78,15 +82,19 @@ export default function Home() {
   // Transient "generation complete" flag — drives a fade-out border pulse.
   const [justCompleted, setJustCompleted] = useState(false);
 
-  // Auto-scroll the result panel into view the first time tokens start
-  // arriving. Gated by didAutoScrollRef so mid-stream re-renders don't
+  // Auto-scroll the result panel into view as soon as Step 3 mounts — the
+  // user should see the generation affordance immediately, not wait for the
+  // first token. Gated by didAutoScrollRef so mid-stream re-renders don't
   // hijack the scroll position while the user is reading.
   useEffect(() => {
-    if (step === 3 && optimizedPrompt && !didAutoScrollRef.current) {
-      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (step === 3 && !didAutoScrollRef.current) {
+      // rAF lets the result DOM node mount + layout before we measure it.
+      requestAnimationFrame(() => {
+        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       didAutoScrollRef.current = true;
     }
-  }, [step, optimizedPrompt]);
+  }, [step]);
 
   // When a stream finishes (streaming: true → false), flash a border pulse.
   const wasStreaming = useRef(false);
@@ -114,7 +122,7 @@ export default function Home() {
   //   clarifying | cached | meta | token | done | error
   // We update state incrementally so the optimized prompt renders as it is
   // generated, not after the full synthesis completes.
-  async function callApi(userInput) {
+  async function callApi(userInput, { skipClarification = false } = {}) {
     setError("");
     setResult(null); // clear prior run — critical so stale optimized prompt
                      //                   doesn't flash while we await clarifying
@@ -127,7 +135,7 @@ export default function Home() {
     const res = await fetch("/api/orchestrate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userInput, targetModel }),
+      body: JSON.stringify({ userInput, targetModel, skipClarification }),
     });
     if (!res.ok || !res.body) {
       setError(`Request failed (${res.status})`);
@@ -158,6 +166,7 @@ export default function Home() {
           setQuestions(ev.questions ?? []);
           setAnswers(new Array(ev.questions?.length ?? 0).fill(""));
           setClarityScore(ev.clarityScore ?? null);
+          setClarifyRound((r) => r + 1);
           setStep(2);
           break;
         case "cached":
@@ -215,14 +224,34 @@ export default function Home() {
     startTransition(() => callApi(intent.trim()));
   }
 
-  function handleStep2Submit(e) {
-    e.preventDefault();
-    const enriched =
+  // Build the enriched prompt from whatever answers the user has filled in.
+  // Blank answers are permitted — they become "(not specified)" so the model
+  // knows the user explicitly declined rather than forgot.
+  function buildEnrichedInput() {
+    return (
       `${intent.trim()}\n\n--- Additional context ---\n` +
       questions
         .map((q, i) => `Q: ${q}\nA: ${(answers[i] ?? "").trim() || "(not specified)"}`)
-        .join("\n\n");
-    startTransition(() => callApi(enriched));
+        .join("\n\n")
+    );
+  }
+
+  function handleStep2Submit(e) {
+    e.preventDefault();
+    // skipClarification=true unconditionally on re-submit: the user has now
+    // seen the questions and chosen to proceed, even with partial answers.
+    // Prevents the server from looping back into another clarifying round.
+    startTransition(() => callApi(buildEnrichedInput(), { skipClarification: true }));
+  }
+
+  function handleStep2Skip() {
+    // "Skip & Generate" — bypass the questions entirely. We send ONLY the
+    // original raw intent (no Q/A appendix), telling the orchestrator to
+    // proceed straight to synthesis without another clarification round.
+    // This differs from Continue, which sends the user's filled-in answers.
+    startTransition(() =>
+      callApi(intent.trim(), { skipClarification: true })
+    );
   }
 
   function handleStartOver() {
@@ -235,6 +264,7 @@ export default function Home() {
     setOptimizedPrompt("");
     setError("");
     setClarityScore(null);
+    setClarifyRound(0);
     setCopied(false);
     setJustCompleted(false);
     didAutoScrollRef.current = false;
@@ -268,6 +298,18 @@ export default function Home() {
       >
         {/* ── Wizard column ───────────────────────────────────────────── */}
         <section className="min-w-0">
+          {/* Hero — product name + tagline. Sits above the stepper so the
+              positioning statement reads as branding, not form copy. */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold tracking-tight text-text sm:text-4xl">
+              PromptBuddy
+            </h1>
+            <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-text-muted sm:text-base">
+              Built for non-technical professionals who want expert-quality LLM
+              output without learning prompt engineering.
+            </p>
+          </div>
+
           <Stepper currentStep={step} />
 
           <div className="mt-8 rounded-2xl border border-border bg-surface/80 backdrop-blur-sm shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)]">
@@ -291,11 +333,13 @@ export default function Home() {
 
             {step === 2 && (
               <StepClarification
+                round={clarifyRound}
                 questions={questions}
                 answers={answers}
                 setAnswers={setAnswers}
                 clarityScore={clarityScore}
                 onSubmit={handleStep2Submit}
+                onSkip={handleStep2Skip}
                 onBack={() => setStep(1)}
                 isPending={isPending}
               />
@@ -501,7 +545,7 @@ function StepIntent({ intentRef, intent, setIntent, targetModel, setTargetModel,
 // ═══════════════════════════════════════════════════════════════════════════
 
 function StepClarification({
-  questions, answers, setAnswers, clarityScore, onSubmit, onBack, isPending,
+  round, questions, answers, setAnswers, clarityScore, onSubmit, onSkip, onBack, isPending,
 }) {
   function updateAnswer(i, value) {
     setAnswers((prev) => {
@@ -515,10 +559,18 @@ function StepClarification({
     <form onSubmit={onSubmit} className="p-6 sm:p-8">
       <div className="flex items-start justify-between gap-4">
         <div>
+          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-accent-2">
+            <span>Follow-up Questions</span>
+            {round > 0 && (
+              <span className="rounded-md bg-accent-2/15 px-1.5 py-0.5 font-mono text-[10px] text-accent-2">
+                Round {round}
+              </span>
+            )}
+          </div>
           <h2 className="text-lg font-semibold text-text">Help us sharpen this</h2>
           <p className="mt-1 text-sm text-text-muted">
-            Your intent is a bit ambiguous. Answer what you can — anything you skip will be
-            left open for the model to infer.
+            Answer what you can — skip anything you're unsure about and we'll
+            generate your prompt with the detail you have.
           </p>
         </div>
         {typeof clarityScore === "number" && (
@@ -533,12 +585,15 @@ function StepClarification({
         )}
       </div>
 
-      <div className="mt-6 space-y-4">
+      {/* Keying on `round` remounts the question list whenever a new round
+          arrives, re-triggering the staggered slide/fade animation so users
+          get a clear visual signal that fresh questions have loaded. */}
+      <div key={round} className="mt-6 space-y-4">
         {questions.map((q, i) => (
           <div
             key={i}
             className="rounded-xl border border-border bg-surface-2/60 p-4"
-            style={{ animation: `fadeIn 300ms ease-out ${i * 60}ms both` }}
+            style={{ animation: `fadeIn 300ms ease-out ${i * 80}ms both` }}
           >
             <label
               htmlFor={`a-${i}`}
@@ -561,7 +616,7 @@ function StepClarification({
         ))}
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-3">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -570,14 +625,25 @@ function StepClarification({
         >
           ← Back
         </button>
-        <button
-          type="submit"
-          disabled={isPending}
-          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-accent to-accent-2 px-6 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(124,58,237,0.6)] transition hover:shadow-[0_12px_32px_-8px_rgba(124,58,237,0.8)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {isPending ? <Spinner /> : null}
-          {isPending ? "Synthesising…" : "Generate prompt →"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onSkip}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-muted transition hover:border-accent/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
+            title="Generate now without answering the questions"
+          >
+            Skip & Generate
+          </button>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-accent to-accent-2 px-6 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(124,58,237,0.6)] transition hover:shadow-[0_12px_32px_-8px_rgba(124,58,237,0.8)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isPending ? <Spinner /> : null}
+            {isPending ? "Synthesising…" : "Generate prompt →"}
+          </button>
+        </div>
       </div>
     </form>
   );
@@ -677,15 +743,23 @@ function StepResult({
             </svg>
             <span>Improved Prompt</span>
           </div>
-          <pre className="whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-text">
-            {optimizedPrompt}
-            {cursorInPrompt && (
-              <span className="ml-0.5 inline-block h-3.5 w-[2px] translate-y-0.5 animate-pulse bg-accent-2 align-baseline" />
-            )}
-            {!optimizedPrompt && !streaming && (
-              <span className="text-text-dim italic">No prompt returned.</span>
-            )}
-          </pre>
+          {/* When Power Mode is off, the Reasoning disclosure is hidden —
+              so there's nothing visible during the <thinking> phase before
+              ### PROMPT START. Show a shimmer skeleton + status line so the
+              user has feedback that work is happening. */}
+          {!powerMode && streaming && !optimizedPrompt ? (
+            <GeneratingSkeleton />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-text">
+              {optimizedPrompt}
+              {cursorInPrompt && (
+                <span className="ml-0.5 inline-block h-3.5 w-[2px] translate-y-0.5 animate-pulse bg-accent-2 align-baseline" />
+              )}
+              {!optimizedPrompt && !streaming && (
+                <span className="text-text-dim italic">No prompt returned.</span>
+              )}
+            </pre>
+          )}
         </div>
 
         <ResearchBlueprintFooter sources={result?.ragSources ?? []} />
@@ -754,6 +828,66 @@ function ReasoningDisclosure({ thinking, grounding, evalPrediction, showCursor }
         )}
       </div>
     </details>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Generating Skeleton — Power-Mode-off loader. Without the Reasoning panel
+// there's no visible feedback during the <thinking> phase, so we show a
+// rotating status line ("Analysing intent → Retrieving research → …") plus
+// shimmering placeholder bars that hint at the prompt's shape. The status
+// phrase advances on a timer; a11y: aria-live announces each phase for
+// screen readers. Bars use the Tailwind `animate-pulse` utility with
+// staggered opacity via per-bar delay for a wave effect.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function GeneratingSkeleton() {
+  const PHASES = [
+    "Analysing intent…",
+    "Retrieving research…",
+    "Synthesising prompt…",
+    "Polishing output…",
+  ];
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setPhase((p) => (p + 1) % PHASES.length), 1400);
+    return () => clearInterval(id);
+  }, []);
+
+  // Bar widths are deliberately irregular so the block reads as prose-like
+  // text rather than a table. All bars use `animate-pulse`; staggered
+  // `animationDelay` produces a left-to-right shimmer wave.
+  const bars = [
+    "w-[92%]", "w-[78%]", "w-[85%]",
+    "w-[68%]", "w-[88%]", "w-[55%]",
+  ];
+
+  return (
+    <div aria-live="polite" aria-busy="true">
+      <div className="flex items-center gap-2.5 text-[12px] font-medium text-accent-2">
+        <span
+          className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-accent-2/30 border-t-accent-2 animate-spin"
+          aria-hidden="true"
+        />
+        <span key={phase} className="animate-[fadeIn_260ms_ease-out]">
+          {PHASES[phase]}
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-2.5">
+        {bars.map((w, i) => (
+          <div
+            key={i}
+            className={`h-3 rounded-md bg-gradient-to-r from-accent/15 via-accent-2/25 to-accent/15 animate-pulse ${w}`}
+            style={{ animationDelay: `${i * 120}ms` }}
+          />
+        ))}
+      </div>
+
+      <p className="mt-4 text-[11px] italic text-text-dim">
+        Grounding your prompt in 12+ research papers — this usually takes 8–12 seconds.
+      </p>
+    </div>
   );
 }
 

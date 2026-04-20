@@ -2,12 +2,15 @@
 
 import { useMemo, useState } from "react";
 
-const CATEGORIES = ["All", "Reasoning", "Structure", "Style"];
+const CATEGORIES = ["All", "Reasoning", "Structure", "Accuracy", "Advanced"];
 
 // Category pill colour — the vault stays colour-coded for fast scanning.
 const CATEGORY_STYLES = {
   Reasoning: "bg-accent/15 text-accent",
   Structure: "bg-accent-2/15 text-accent-2",
+  Accuracy:  "bg-success/15 text-success",
+  Advanced:  "bg-warning/15 text-warning",
+  // Legacy "Style" rows still render with their original tint until re-tagged.
   Style:     "bg-warning/15 text-warning",
   default:   "bg-border-2/40 text-text-muted",
 };
@@ -52,10 +55,14 @@ export default function VaultClient({ entries, error }) {
           <h1 className="text-3xl font-semibold tracking-tight text-text">
             Knowledge Vault
           </h1>
+          <p className="mt-2 max-w-2xl text-sm text-text">
+            <span className="font-semibold text-accent-2">The Research Lab:</span>{" "}
+            Explore the academic papers and industry best practices that power
+            our optimization engine.
+          </p>
           <p className="mt-2 max-w-2xl text-sm text-text-muted">
-            Curated research on prompting techniques. These entries ground the
-            RAG layer of every optimization — search or filter by category to
-            explore what's in the corpus.
+            Search or filter by category to explore what's in the corpus —
+            every entry grounds the RAG layer of every optimization.
           </p>
         </div>
       </div>
@@ -197,15 +204,16 @@ function VaultCard({ entry }) {
 
       <div className="flex-1" />
 
-      {/* Best For — metadata block */}
-      <div className="mt-5 border-t border-border pt-3">
-        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-text-dim">
-          Best For
-        </div>
-        <div className="mt-1 line-clamp-2 text-[13px] text-text">
-          {entry.best_for || "—"}
-        </div>
-      </div>
+      {/* "Best For" — inline bold label. Reads as a continuation of the
+          summary rather than a separate decorative panel, which keeps the
+          card dense and scannable. mt-5 gives the section clear breathing
+          room from the summary above. */}
+      {entry.best_for && (
+        <p className="mt-5 text-[13px] leading-relaxed text-text-muted">
+          <strong className="font-semibold text-text">Best For:</strong>{" "}
+          {entry.best_for}
+        </p>
+      )}
 
       {/* Citation link */}
       {entry.citation_url && (

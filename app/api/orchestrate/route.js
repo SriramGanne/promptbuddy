@@ -269,7 +269,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { userInput, targetModel } = body;
+  const { userInput, targetModel, skipClarification } = body;
   if (!userInput || !targetModel) {
     return NextResponse.json(
       { error: "userInput and targetModel are required." },
@@ -290,8 +290,20 @@ export async function POST(request) {
         // is needed for BOTH the semantic cache lookup and RAG retrieval.
         // Running them concurrently saves ~150–300ms on the happy path.
         // If the gap returns "insufficient", we discard the unused embedding.
+        //
+        // skipClarification bypasses gap analysis entirely — used when the
+        // user clicks "Skip & Generate" on the clarification step, or on any
+        // re-submission after a clarifying round. Prevents infinite loops
+        // and lets users force a generation with whatever detail they have.
         const [gap, queryEmbedding] = await Promise.all([
-          analyzeGaps(userInput),
+          skipClarification
+            ? Promise.resolve({
+                sufficient: true,
+                clarityScore: 0.7,
+                questions: [],
+                missingDimensions: [],
+              })
+            : analyzeGaps(userInput),
           embedQuery(userInput),
         ]);
 
