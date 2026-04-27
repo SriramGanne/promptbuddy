@@ -88,22 +88,26 @@ export async function install() {
     env: envBlock,
   };
 
-  // Step 4: Read .env.local and auto-inject matching keys
-  const envLocalPath = join(cwd, '.env.local');
-  if (existsSync(envLocalPath)) {
-    try {
-      const envVars = parseEnvFile(readFileSync(envLocalPath, 'utf8'));
-      for (const key of CONFIG_KEYS) {
-        if (envVars[key]) {
-          settings.mcpServers.promptpilot.env[key] = envVars[key];
-          injected.push(key);
+  // Step 4: Read .env / .env.local and auto-inject matching keys
+  for (const envFile of ['.env', '.env.local']) {
+    const envPath = join(cwd, envFile);
+    if (existsSync(envPath)) {
+      try {
+        const envVars = parseEnvFile(readFileSync(envPath, 'utf8'));
+        const newKeys = [];
+        for (const key of CONFIG_KEYS) {
+          if (envVars[key] && !settings.mcpServers.promptpilot.env[key]) {
+            settings.mcpServers.promptpilot.env[key] = envVars[key];
+            injected.push(key);
+            newKeys.push(key);
+          }
         }
+        if (newKeys.length > 0) {
+          console.log(chalk.green('  ✔') + ` Auto-injected ${newKeys.length} key(s) from ${envFile}`);
+        }
+      } catch (err) {
+        console.log(chalk.yellow('  ⚠') + ` Could not read ${envFile}: ${err.message}`);
       }
-      if (injected.length > 0) {
-        console.log(chalk.green('  ✔') + ` Auto-injected ${injected.length} key(s) from .env.local`);
-      }
-    } catch (err) {
-      console.log(chalk.yellow('  ⚠') + ` Could not read .env.local: ${err.message}`);
     }
   }
 

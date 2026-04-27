@@ -51,15 +51,17 @@ export function getConfig() {
     }
   }
 
-  const envLocalPath = join(process.cwd(), '.env.local');
-  if (existsSync(envLocalPath)) {
-    try {
-      const envVars = parseEnvFile(readFileSync(envLocalPath, 'utf8'));
-      for (const key of CONFIG_KEYS) {
-        if (envVars[key]) config[key] = envVars[key];
+  for (const envFile of ['.env', '.env.local']) {
+    const envPath = join(process.cwd(), envFile);
+    if (existsSync(envPath)) {
+      try {
+        const envVars = parseEnvFile(readFileSync(envPath, 'utf8'));
+        for (const key of CONFIG_KEYS) {
+          if (envVars[key]) config[key] = envVars[key];
+        }
+      } catch (err) {
+        console.warn(`Warning: Could not read ${envFile}:`, err.message);
       }
-    } catch (err) {
-      console.warn('Warning: Could not read .env.local:', err.message);
     }
   }
 

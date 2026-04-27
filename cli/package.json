@@ -1,10 +1,38 @@
 {
-  "name": "promptpilot",
+  "name": "promptpilot-mcp",
   "version": "1.0.0",
-  "description": "CLI that intercepts and optimizes prompts before Claude sees them",
+  "description": "MCP server that intercepts and optimizes prompts using RAG-grounded LLM synthesis before Claude responds.",
   "type": "module",
   "bin": {
-    "promptpilot": "./bin/promptpilot.js"
+    "promptpilot": "./bin/promptpilot.js",
+    "promptpilot-mcp": "./bin/mcp.js"
+  },
+  "files": [
+    "bin/",
+    "src/"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "claude",
+    "mcp",
+    "prompt-engineering",
+    "prompt-optimization",
+    "claude-code",
+    "anthropic",
+    "rag",
+    "llm"
+  ],
+  "author": "Kalyan Krapa <krapa.kalyan@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Krapa007/PromptPilot.git"
+  },
+  "homepage": "https://github.com/Krapa007/PromptPilot",
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "latest",

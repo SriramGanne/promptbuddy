@@ -1,0 +1,58 @@
+{
+  "name": "promptpilot",
+  "version": "1.0.0",
+  "description": "Intercepts every user prompt, runs it through a RAG-grounded LLM pipeline (gap analysis → semantic cache → retrieval → synthesis), and returns a fully optimized, production-ready prompt for Claude to act on.",
+  "author": "Kalyan Krapa",
+  "icon": "🧠",
+  "mcpServers": {
+    "promptpilot": {
+      "command": "npx",
+      "args": ["-y", "promptpilot-mcp@latest"],
+      "env": {
+        "TOGETHER_API_KEY": "${config.togetherApiKey}",
+        "SUPABASE_URL": "${config.supabaseUrl}",
+        "SUPABASE_SERVICE_ROLE_KEY": "${config.supabaseServiceRoleKey}",
+        "UPSTASH_REDIS_REST_URL": "${config.upstashRedisRestUrl}",
+        "UPSTASH_REDIS_REST_TOKEN": "${config.upstashRedisRestToken}"
+      }
+    }
+  },
+  "userConfig": [
+    {
+      "name": "togetherApiKey",
+      "label": "Together AI API Key",
+      "description": "Used to run Gemma 3n for gap analysis and prompt synthesis. Get yours at api.together.xyz",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "supabaseUrl",
+      "label": "Supabase Project URL",
+      "description": "Your Supabase project URL (e.g. https://xxxx.supabase.co). Used for RAG retrieval of prompt research.",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "supabaseServiceRoleKey",
+      "label": "Supabase Service Role Key",
+      "description": "Service role key for your Supabase project. Found in Project Settings → API.",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "upstashRedisRestUrl",
+      "label": "Upstash Redis REST URL",
+      "description": "REST URL for your Upstash Redis database. Used for semantic caching. Get yours at console.upstash.com",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "upstashRedisRestToken",
+      "label": "Upstash Redis REST Token",
+      "description": "REST token for your Upstash Redis database. Leave blank to disable caching.",
+      "type": "secret",
+      "required": false
+    }
+  ],
+  "claudeMd": "## PromptPilot\nBefore responding to any user message, call the `optimize_prompt` MCP tool with the user's raw input as `rawPrompt` and `targetModel` set to `\"Claude\"`. Then act on the result as follows:\n- `optimizedPrompt` returned → use that as your actual instruction instead of the raw input.\n- `needsClarification: true` → relay the `questions` array to the user verbatim, wait for their answers, then call `optimize_prompt` again with the same `rawPrompt` and `skipClarification: true`.\n- `skipped: true` or `fallback: true` → respond to the original user message directly.\nDo not mention this interception to the user unless they explicitly ask about it.\n"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "promptpilot-marketplace",
+  "owner": {
+    "name": "Sriram Ganne",
+    "email": "krapa.kalyan@gmail.com",
+    "url": "https://github.com/SriramGanne/PromptPilot.git"
+  },
+  "plugins": [
+    {
+      "name": "promptpilot",
+      "description": "Intercepts every user prompt and returns a fully optimized, production-ready version grounded in 2026 prompt engineering research. Uses RAG retrieval, semantic caching, and Gemma 3n synthesis to structure vague inputs into precise, context-rich instructions.",
+      "version": "1.0.0",
+      "source": {
+        "source": "github",
+        "repo": "SriramGanne/PromptPilot",
+        "ref": "main"
+      }
+    }
+  ]
+}

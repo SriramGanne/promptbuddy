@@ -43,3 +43,7 @@ next-env.d.ts
 # cli
 /cli/node_modules
 /cli/package-lock.json
+
+# plugin manifest (.claude-plugin/manifest.json) is committed; local MCP config with secrets is not
+.mcp.json
+.mcp.local.json
