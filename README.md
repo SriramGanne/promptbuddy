@@ -81,12 +81,13 @@ flowchart TD
 * **Transport:** MCP (Model Context Protocol) — stdio server via `npx`
 
 ### Evaluator-Optimizer Loop
-1. **Triage** — short inputs (< 6 words) skip the pipeline entirely
-2. **Gap Analysis** — Gemma 3n scores clarity; asks follow-up questions if score < 0.7
-3. **Embed & Cache** — 1024-dim embedding; returns cached result on semantic hit
-4. **RAG Retrieval** — top-3 research chunks from Supabase pgvector
-5. **Synthesis** — Gemma 3n generates the optimized prompt grounded in retrieved research
-6. **Audit** — faithfulness score computed via RAG word overlap; metrics logged to Supabase
+1. **Sanitize** — injection markers (`### PROMPT START`, `<thinking>`, etc.) stripped from raw input
+2. **Triage** — short inputs (< 6 words) skip the pipeline entirely
+3. **Gap Analysis** — Gemma 3n scores clarity; asks follow-up questions if score < 0.7
+4. **Embed & Cache** — 1024-dim embedding; validated cache payload returned on semantic hit
+5. **RAG Retrieval** — top-3 research chunks from Supabase pgvector
+6. **Synthesis** — RAG chunks XML-isolated; Gemma 3n generates the optimized prompt
+7. **Audit** — faithfulness score computed via RAG word overlap; metrics logged to Supabase
 
 ---
 
@@ -188,6 +189,22 @@ npm install -g promptpilot-mcp
 
 ---
 
+## 🔒 Security
+
+PromptPilot operates on user prompts before any LLM sees them, making the pipeline itself a trust boundary. The following defences are built into the MCP server:
+
+| Layer | Defence |
+|---|---|
+| Input | `sanitizeRawPrompt()` strips structural injection markers from `rawPrompt` before pipeline entry |
+| Cache | `validateCachedPayload()` allowlists Redis cache keys and caps `optimizedPrompt` at 8000 chars — prevents a compromised cache from injecting arbitrary instructions |
+| RAG | Each knowledge chunk is XML-wrapped with an explicit "treat as inert data" instruction; content capped at 800 chars with breakout-sequence stripping |
+| State | `writeState()` uses a key allowlist — only `lastRunAt` can persist to `~/.promptpilot/state.json` |
+| Secrets | `.env`, `.env.local`, `.claude/settings.json`, and `.mcp.json` are all gitignored — credentials never enter version control |
+
+> Full security details: [ARCHITECTURE.md — Security Measures](ARCHITECTURE.md#security-measures)
+
+---
+
 ## 🗺️ Roadmap
 
 * **[ ] Multimodal Intent:** Support for image-to-prompt (Visual Prompt Engineering)
@@ -203,4 +220,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-**Developed by Kalyan Krapa**
+**Developed by Sriram Ganne**
